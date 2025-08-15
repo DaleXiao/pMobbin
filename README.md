@@ -1,6 +1,7 @@
-Install
-git clone https://github.com/DaleXiao/pMobbin
+### Install
+Step 1: git clone https://github.com/DaleXiao/pMobbin
 
-update the .env file with the token you get from browser
+Step 2: Update the .env file with the token you get from browser
 
-docker-compose up -d --build
+Step 3:
+ ```docker-compose up -d --build ```
