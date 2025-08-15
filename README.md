@@ -1,3 +1,5 @@
+A python project to get files from Mobbin, code by Gemini, lol.
+
 ### Install
 Step 1: git clone https://github.com/DaleXiao/pMobbin
 
