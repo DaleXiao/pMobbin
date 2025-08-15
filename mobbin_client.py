@@ -6,9 +6,14 @@ class MobbinClient:
     """
     最终版 Mobbin API 客户端。
     通过 API Key 初始化，并提供程序化登录和数据获取功能。
-    所有请求都统一发往 Supabase 的真实后端地址，以绕过所有网络问题。
+    支持“邮箱+验证码”和“邮箱+密码”两种登录方式。
     """
     def __init__(self, api_key: str, access_token: str = None):
+        """
+        使用公开的 API Key 和可选的 Access Token 初始化客户端。
+        :param api_key: 从浏览器网络请求中找到的公开匿名 Key。
+        :param access_token: 登录后获取到的个人身份凭证。
+        """
         if not api_key:
             raise ValueError("客户端初始化时必须提供 API Key！")
         
@@ -24,10 +29,12 @@ class MobbinClient:
             self._update_authorization_header()
 
     def _update_authorization_header(self):
+        """私有方法，用于更新或添加 Authorization 头。"""
         if self.access_token:
             self._headers["Authorization"] = f"Bearer {self.access_token}"
 
     def _make_request(self, method: str, url: str, headers: dict, params: dict = None, json_data: dict = None):
+        """统一的私有请求方法，用于捕获和打印错误。"""
         try:
             response = requests.request(method, url, headers=headers, params=params, json=json_data, timeout=20)
             response.raise_for_status()
@@ -39,6 +46,7 @@ class MobbinClient:
             return None
 
     def send_login_otp(self, email: str):
+        """【登录方式一】第一步：向指定邮箱发送一次性登录密码 (OTP)。"""
         print(f"正在向邮箱 {email} 发送登录验证码...")
         url = "https://ujasntkfphywizsdaapi.supabase.co/auth/v1/otp"
         payload = {"email": email, "create_user": False}
@@ -47,6 +55,7 @@ class MobbinClient:
         return response_json is not None
 
     def verify_otp_and_login(self, email: str, otp: str):
+        """【登录方式一】第二步：使用邮箱和 OTP 验证，并获取 access_token。"""
         print(f"正在使用邮箱 {email} 和验证码进行验证...")
         url = "https://ujasntkfphywizsdaapi.supabase.co/auth/v1/verify"
         payload = {"type": "email", "email": email, "token": otp}
@@ -55,13 +64,45 @@ class MobbinClient:
         if data and data.get("access_token"):
             self.access_token = data["access_token"]
             self._update_authorization_header()
-            print("登录成功！Access Token 已获取并设置到客户端。")
+            print("OTP 登录成功！Access Token 已获取并设置到客户端。")
             return data
         else:
-            print("验证失败或响应中未找到 access_token。")
+            print("OTP 验证失败或响应中未找到 access_token。")
+            return None
+
+    # --- 新增的密码登录方法 ---
+    def login_with_password(self, email: str, password: str):
+        """
+        【登录方式二】使用邮箱和密码进行登录。
+        注意：仅适用于在 Mobbin 上单独设置过密码的账户。
+        """
+        print(f"正在尝试使用邮箱 {email} 和密码登录...")
+        
+        # Supabase 用于密码登录的 API endpoint
+        url = "https://ujasntkfphywizsdaapi.supabase.co/auth/v1/token?grant_type=password"
+        
+        payload = {
+            "email": email,
+            "password": password
+        }
+        headers = {"apikey": self.api_key, "Content-Type": "application/json"}
+
+        data = self._make_request("POST", url, headers=headers, json_data=payload)
+        
+        if data and data.get("access_token"):
+            self.access_token = data["access_token"]
+            self._update_authorization_header()
+            print("密码登录成功！Access Token 已获取并设置到客户端。")
+            return data
+        else:
+            print("密码登录失败，请检查邮箱和密码。")
             return None
 
     def search_apps(self, query: str, platform: str = "ios"):
+        """
+        搜索 App (需要先登录)。
+        此为最终验证版，使用 PostgREST 的数据表过滤方式进行搜索。
+        """
         print(f"正在使用【最终验证版数据表过滤】接口搜索 App: '{query}'...")
         url = "https://ujasntkfphywizsdaapi.supabase.co/rest/v1/apps"
         processed_query = query.replace(' ', '|')
@@ -72,7 +113,6 @@ class MobbinClient:
         }
         return self._make_request("GET", url, headers=self._headers, params=params)
 
-    # --- 新增的测试方法 ---
     def get_latest_apps(self, limit: int = 20, platform: str = "ios"):
         """
         获取最新的 App 列表，不进行搜索。
@@ -82,7 +122,7 @@ class MobbinClient:
         params = {
             "select": "*",
             "platform": f"eq.{platform}",
-            "order": "updatedAt.desc",  # 按更新时间降序排序
+            "order": "updatedAt.desc",
             "limit": str(limit)
         }
         return self._make_request("GET", url, headers=self._headers, params=params)
