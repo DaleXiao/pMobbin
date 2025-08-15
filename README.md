@@ -11,7 +11,7 @@ Step 3:
  ```docker-compose up -d --build ```
 
 ### What I have done
-Tested the APIs: Login with Mobbin account, Search function
+Tested the APIs: Login with Mobbin account (support both google SSO and username/pwd login), Search function
 
 ### Work in progress
 Get completed data from Mobbin
