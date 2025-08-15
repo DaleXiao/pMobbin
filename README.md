@@ -3,7 +3,7 @@ A python project to get files from Mobbin, code by Gemini, lol.
 Recommend to deploy via Docker
 
 ### Install
-Step 1: git clone https://github.com/DaleXiao/pMobbin
+Step 1: ```git clone https://github.com/DaleXiao/pMobbin ```
 
 Step 2: Update the .env file with the token you get from browser
 
