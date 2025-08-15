@@ -1,0 +1,16 @@
+# docker-compose.yml (最终的动态登录版)
+
+version: '3.8'
+
+services:
+  mobbin-api:
+    build: .
+    container_name: mobbin-api
+    ports:
+      - "8085:8000"
+    # 注意：environment 或 env_file 部分已经被完全移除了！
+    env_file:
+      # 指示 Docker Compose 加载 .env 文件中的所有变量
+      - .env
+    # 建议添加 restart 策略，以便在容器意外退出时自动重启
+    restart: unless-stopped
