@@ -109,7 +109,8 @@ class MobbinClient:
         # wfts 会自动处理空格，并将它们解释为 AND 连接符，但为了明确，我们手动替换。
         # 例如，搜索 "time schedule" 会被转换为 "time & schedule"，
         # 这意味着会查找同时包含 "time" 和 "schedule" 的应用。
-        processed_query = query.replace(' ', '&')
+        # Use " & " between terms so Supabase interprets it as a logical AND
+        processed_query = " & ".join(query.split())
         params = {
             "select": "*",
             "platform": f"eq.{platform}",
