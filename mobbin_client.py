@@ -103,17 +103,13 @@ class MobbinClient:
         搜索 App (需要先登录)。
         此为最终验证版，使用 PostgREST 的数据表过滤方式进行搜索。
         """
-        print(f"正在使用【最终验证版数据表过滤】接口搜索 App: '{query}'...")
+        print(f"正在使用 ilike 接口搜索 App: '{query}'...")
         url = "https://ujasntkfphywizsdaapi.supabase.co/rest/v1/apps"
-        # 使用 websearch_to_tsquery (wfts) 来实现更符合用户预期的搜索功能。
-        # wfts 会自动处理空格，并将它们解释为 AND 连接符，但为了明确，我们手动替换。
-        # 例如，搜索 "time schedule" 会被转换为 "time & schedule"，
-        # 这意味着会查找同时包含 "time" 和 "schedule" 的应用。
-        processed_query = query.replace(' ', '&')
+        # 使用 ilike 进行大小写不敏感的模糊搜索，这是一个更可靠的备用方案
         params = {
             "select": "*",
             "platform": f"eq.{platform}",
-            "appName": f"wfts.{processed_query}"
+            "appName": f"ilike.*{query}*"
         }
         return self._make_request("GET", url, headers=self._headers, params=params)
 
