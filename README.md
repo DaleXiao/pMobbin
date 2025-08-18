@@ -1,4 +1,4 @@
-A python project to get files from Mobbin, code by Gemini, lol.
+A python project to get files from Mobbin, code by Gemini, Codex, and Claude 4, no code by human, lol.
 
 Recommend to deploy via Docker
 
@@ -11,7 +11,5 @@ Step 3:
  ```docker-compose up -d --build ```
 
 ### What I have done
-Tested the APIs: Login with Mobbin account (support both google SSO and username/pwd login), Search function
-
-### Work in progress
-Get completed data from Mobbin
+Loggin - support both Google account SSO, and Email + Password login
+Search - it's now able to fetch content from Mobbin.
