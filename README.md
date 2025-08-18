@@ -21,7 +21,8 @@ Step 2: Update the .env file with the token you get from browser
 Step 3:
  ```docker-compose up -d --build ```
 
-### Of if you want to run it locally
+
+### Of you can to run it locally
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
