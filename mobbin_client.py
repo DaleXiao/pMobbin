@@ -36,12 +36,39 @@ class MobbinClient:
     def _make_request(self, method: str, url: str, headers: dict, params: dict = None, json_data: dict = None):
         """统一的私有请求方法，用于捕获和打印错误。"""
         try:
+            # 打印请求详情用于调试
+            print(f"请求方法: {method}")
+            print(f"请求URL: {url}")
+            if params:
+                print(f"请求参数: {params}")
+            
             response = requests.request(method, url, headers=headers, params=params, json=json_data, timeout=20)
+            
+            # 打印响应状态
+            print(f"响应状态码: {response.status_code}")
+            
+            # 处理非 200 状态码
+            if response.status_code == 404:
+                print("404 错误：端点不存在")
+                return None
+            elif response.status_code >= 400:
+                print(f"错误响应: {response.text[:200]}")
+                return None
+                
             response.raise_for_status()
-            return response.json()
+            
+            # 尝试解析 JSON
+            result = response.json()
+            print(f"响应数据条数: {len(result) if isinstance(result, list) else 'N/A'}")
+            
+            return result
+        except requests.exceptions.JSONDecodeError as e:
+            print(f"JSON 解析失败: {e}")
+            print(f"原始响应内容: {response.text[:500]}...")  # 只打印前500字符
+            return None
         except requests.exceptions.RequestException as e:
             print(f"网络请求失败: {e}")
-            if e.response is not None:
+            if hasattr(e, 'response') and e.response is not None:
                 print(f"错误响应详情: {e.response.status_code} - {e.response.text}")
             return None
 
@@ -100,34 +127,136 @@ class MobbinClient:
 
     def search_apps(self, query: str, platform: str = "ios"):
         """
-        搜索 App (需要先登录)。
-        此为最终验证版，使用 PostgREST 的数据表过滤方式进行搜索。
+        搜索 App - 使用 Mobbin 的实际 API
         """
-        print(f"正在使用【最终验证版数据表过滤】接口搜索 App: '{query}'...")
-        url = "https://ujasntkfphywizsdaapi.supabase.co/rest/v1/apps"
-        # 使用 websearch_to_tsquery (wfts) 来实现更符合用户预期的搜索功能。
-        # wfts 会自动处理空格，并将它们解释为 AND 连接符，但为了明确，我们手动替换。
-        # 例如，搜索 "time schedule" 会被转换为 "time & schedule"，
-        # 这意味着会查找同时包含 "time" 和 "schedule" 的应用。
-        # Use " & " between terms so Supabase interprets it as a logical AND
-        processed_query = " & ".join(query.split())
+        print(f"正在搜索 App: '{query}'...")
+        
+        # Mobbin 的实际 API endpoint
+        base_url = "https://mobbin.com/api/browse"
+        url = f"{base_url}/{platform}/apps"
+        
+        # 构建查询参数
         params = {
-            "select": "*",
-            "platform": f"eq.{platform}",
-            "appName": f"wfts.{processed_query}"
+            "filterOperator": "and",
+            "pageSize": "50",
+            "sortBy": "publishedAt"
         }
-        return self._make_request("GET", url, headers=self._headers, params=params)
+        
+        # 如果有搜索关键词，添加到参数中
+        if query:
+            # 首先尝试作为搜索参数
+            params["q"] = query
+        
+        # 构建请求头 - 使用 Cookie 而不是 Authorization
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://mobbin.com",
+            "Referer": "https://mobbin.com/",
+            "User-Agent": self._headers["User-Agent"],
+            "Cookie": self._build_cookie()
+        }
+        
+        result = self._make_request("GET", url, headers=headers, params=params)
+        
+        # 如果第一次尝试失败，尝试其他参数名
+        if (result is None or (isinstance(result, dict) and result.get("data", []) == []) or 
+            (isinstance(result, list) and len(result) == 0)):
+            
+            print(f"尝试其他搜索参数...")
+            # 尝试不同的搜索参数名
+            search_params = ["query", "search", "keyword", "name", "appName", "searchQuery"]
+            
+            for param_name in search_params:
+                params_copy = params.copy()
+                params_copy.pop("q", None)  # 移除之前的参数
+                params_copy[param_name] = query
+                
+                print(f"尝试参数: {param_name}={query}")
+                result = self._make_request("GET", url, headers=headers, params=params_copy)
+                
+                if result and ((isinstance(result, dict) and len(result.get("data", [])) > 0) or 
+                              (isinstance(result, list) and len(result) > 0)):
+                    print(f"使用参数 '{param_name}' 搜索成功")
+                    break
+        
+        return result
+    
+    def _build_cookie(self):
+        """构建 Cookie 字符串，包含认证 token"""
+        import urllib.parse
+        import json
+        
+        # 构建 Supabase auth token cookie
+        auth_data = {
+            "access_token": self.access_token,
+            "refresh_token": "placeholder",  # 实际需要时替换
+            "user": {
+                "id": "placeholder",
+                "email": "placeholder"
+            },
+            "token_type": "bearer",
+            "expires_in": 3600,
+            "expires_at": 9999999999  # 未来的时间戳
+        }
+        
+        # URL 编码 JSON 数据
+        auth_cookie_value = urllib.parse.quote(json.dumps(auth_data))
+        
+        # 构建基本的 cookie 字符串
+        cookies = [
+            f"sb-ujasntkfphywizsdaapi-auth-token={auth_cookie_value}",
+            "mobbin#last_browsed_platform=ios",
+            "mobbin#last_browsed_experience=apps"
+        ]
+        
+        return "; ".join(cookies)
+    
+    def browse_apps_by_category(self, category: str, platform: str = "ios", page_size: int = 20):
+        """
+        按类别浏览应用
+        """
+        print(f"浏览类别 '{category}' 的应用...")
+        
+        base_url = "https://mobbin.com/api/browse"
+        url = f"{base_url}/{platform}/apps"
+        
+        params = {
+            "filterOperator": "and",
+            "appCategories[]": category,
+            "pageSize": str(page_size),
+            "sortBy": "publishedAt"
+        }
+        
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://mobbin.com",
+            "Referer": "https://mobbin.com/",
+            "User-Agent": self._headers["User-Agent"],
+            "Cookie": self._build_cookie()
+        }
+        
+        return self._make_request("GET", url, headers=headers, params=params)
 
     def get_latest_apps(self, limit: int = 20, platform: str = "ios"):
         """
-        获取最新的 App 列表，不进行搜索。
+        获取最新的 App 列表 - 使用 Mobbin 的实际 API
         """
         print(f"正在获取最新的 {limit} 个 App...")
-        url = "https://ujasntkfphywizsdaapi.supabase.co/rest/v1/apps"
+        
+        base_url = "https://mobbin.com/api/browse"
+        url = f"{base_url}/{platform}/apps"
+        
         params = {
-            "select": "*",
-            "platform": f"eq.{platform}",
-            "order": "updatedAt.desc",
-            "limit": str(limit)
+            "pageSize": str(limit),
+            "sortBy": "publishedAt"
         }
-        return self._make_request("GET", url, headers=self._headers, params=params)
+        
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://mobbin.com",
+            "Referer": "https://mobbin.com/",
+            "User-Agent": self._headers["User-Agent"],
+            "Cookie": self._build_cookie()
+        }
+        
+        return self._make_request("GET", url, headers=headers, params=params)
