@@ -63,6 +63,7 @@ curl http://localhost:8085/api/search?q=uber
 
 ### What I have done
 Loggin - support both Google account SSO, and Email + Password login
+
 Search - it's now able to fetch content from Mobbin.
 
 Loggin with Email and Password
