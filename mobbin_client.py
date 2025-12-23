@@ -127,57 +127,35 @@ class MobbinClient:
 
     def search_apps(self, query: str, platform: str = "ios"):
         """
-        搜索 App - 使用 Mobbin 的实际 API
+        搜索 App - 使用 Supabase 数据库直接查询
         """
         print(f"正在搜索 App: '{query}'...")
         
-        # Mobbin 的实际 API endpoint
-        base_url = "https://mobbin.com/api/browse"
-        url = f"{base_url}/{platform}/apps"
+        # 使用 Supabase REST API 进行数据库查询
+        url = "https://ujasntkfphywizsdaapi.supabase.co/rest/v1/apps"
         
-        # 构建查询参数
+        # 构建查询参数 - 使用 ilike 进行模糊匹配
         params = {
-            "filterOperator": "and",
-            "pageSize": "50",
-            "sortBy": "publishedAt"
+            "select": "*",
+            "platform": f"eq.{platform}",
+            "appName": f"ilike.%{query}%",
+            "limit": "50",
+            "order": "updatedAt.desc"
         }
         
-        # 如果有搜索关键词，添加到参数中
-        if query:
-            # 首先尝试作为搜索参数
-            params["q"] = query
+        result = self._make_request("GET", url, headers=self._headers, params=params)
         
-        # 构建请求头 - 使用 Cookie 而不是 Authorization
-        headers = {
-            "Accept": "application/json, text/plain, */*",
-            "Origin": "https://mobbin.com",
-            "Referer": "https://mobbin.com/",
-            "User-Agent": self._headers["User-Agent"],
-            "Cookie": self._build_cookie()
-        }
-        
-        result = self._make_request("GET", url, headers=headers, params=params)
-        
-        # 如果第一次尝试失败，尝试其他参数名
-        if (result is None or (isinstance(result, dict) and result.get("data", []) == []) or 
-            (isinstance(result, list) and len(result) == 0)):
-            
-            print(f"尝试其他搜索参数...")
-            # 尝试不同的搜索参数名
-            search_params = ["query", "search", "keyword", "name", "appName", "searchQuery"]
-            
-            for param_name in search_params:
-                params_copy = params.copy()
-                params_copy.pop("q", None)  # 移除之前的参数
-                params_copy[param_name] = query
-                
-                print(f"尝试参数: {param_name}={query}")
-                result = self._make_request("GET", url, headers=headers, params=params_copy)
-                
-                if result and ((isinstance(result, dict) and len(result.get("data", [])) > 0) or 
-                              (isinstance(result, list) and len(result) > 0)):
-                    print(f"使用参数 '{param_name}' 搜索成功")
-                    break
+        # 如果 appName 搜索没有结果，尝试搜索 companyName
+        if result is not None and isinstance(result, list) and len(result) == 0:
+            print(f"appName 搜索无结果，尝试搜索 companyName...")
+            params_company = {
+                "select": "*",
+                "platform": f"eq.{platform}",
+                "companyName": f"ilike.%{query}%",
+                "limit": "50",
+                "order": "updatedAt.desc"
+            }
+            result = self._make_request("GET", url, headers=self._headers, params=params_company)
         
         return result
     
