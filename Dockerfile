@@ -1,20 +1,13 @@
-# Dockerfile
-
-# Lightweight Python image
-FROM python:3.10-slim
-
-# Set working dir
-WORKDIR /app
-
-# Copy and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy all code to working dir
+FROM golang:1.22-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download
 COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /pmobbin .
 
-# Declare the port
-EXPOSE 8000
-
-# Define the command to start docker
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=build /pmobbin /pmobbin
+EXPOSE 8085
+ENV PORT=8085
+ENTRYPOINT ["/pmobbin"]

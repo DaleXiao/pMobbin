@@ -1,73 +1,66 @@
-A python project to get files from Mobbin, code by Gemini, Codex, and Claude 4, no code by human, lol.
+# pMobbin (Go)
 
-Recommend to deploy via Docker
+Unofficial Mobbin API proxy. Login with your Mobbin account, then search/browse app designs.
 
-### How to get api key?
-1. Visit https://mobbin.com with your browser
-2. Login with your account
-3. Open devtool (F12)
-4. Go to Network Tab
-5. Refresh the page or take any other action on this page
-6. Search for `apikey`, it normally looks like (sample below):
-   ```
-   eyJhxxxxxx............
-   ```
+Rewritten from Python/FastAPI to Go — single binary, ~8MB Docker image, zero dependencies.
 
-### Install
-Step 1: ```git clone https://github.com/DaleXiao/pMobbin ```
+## Quick Start
 
-Step 2: Update the .env file with the token you get from browser
-
-Step 3:
- ```docker-compose up -d --build ```
-
-
-### Of you can to run it locally
 ```bash
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
+# Clone
+git clone https://github.com/DaleXiao/pMobbin
+cd pMobbin
+
+# Set your API key (get it from Mobbin browser devtools → Network → look for apikey header)
+cp .env.example .env
+# Edit .env and add your MOBBIN_API_KEY
+
+# Run with Docker
+docker compose up -d --build
+
+# Or run directly
+go build -o pmobbin . && MOBBIN_API_KEY=your_key ./pmobbin
 ```
-#### How to use
-##### 1. Login
 
-###### User name / password
+## API
+
+### Auth
+
 ```bash
+# Password login
 curl -X POST http://localhost:8085/api/login/password \
   -H "Content-Type: application/json" \
-  -d '{
-    "email": "your-email@example.com",
-    "password": "your-password"
-  }'
-```
+  -d '{"email": "you@example.com", "password": "xxx"}'
 
-###### OTP
-```bash
-# Send OTP
+# OTP login (two steps)
 curl -X POST http://localhost:8085/api/login/send-otp \
   -H "Content-Type: application/json" \
-  -d '{"email": "your-email@example.com"}'
+  -d '{"email": "you@example.com"}'
 
-# Verify
 curl -X POST http://localhost:8085/api/login/verify \
   -H "Content-Type: application/json" \
-  -d '{
-    "email": "your-email@example.com",
-    "otp": "123456"
-  }'
+  -d '{"email": "you@example.com", "otp": "123456"}'
 ```
 
-##### Search
+### Data
+
 ```bash
-curl http://localhost:8085/api/search?q=uber
+# Search apps
+curl "http://localhost:8085/api/search?q=uber"
+curl "http://localhost:8085/api/search?q=uber&platform=android"
+
+# Latest apps
+curl "http://localhost:8085/api/apps/latest"
+curl "http://localhost:8085/api/apps/latest?limit=10&platform=ios"
+
+# Browse by category
+curl "http://localhost:8085/api/apps?category=Travel%20%26%20Transportation"
 ```
 
-### What I have done
-Loggin - support both Google account SSO, and Email + Password login
+## Architecture
 
-Search - it's now able to fetch content from Mobbin.
+- `main.go` — entry point, routes
+- `mobbin/client.go` — Mobbin/Supabase API client (auth + data)
+- `api/handler.go` — HTTP handlers
 
-Loggin with Email and Password
-<img width="1332" height="303" alt="image" src="https://github.com/user-attachments/assets/9379e326-8671-4158-b088-185486520779" />
-
-Search and get data
-<img width="1338" height="383" alt="image" src="https://github.com/user-attachments/assets/5c2ed652-141f-461a-ba4e-95bf0df34704" />
+Auth goes through Supabase (Mobbin's backend). The JWT from login is used for both the Supabase REST API and Mobbin's first-party `/api/` endpoints.

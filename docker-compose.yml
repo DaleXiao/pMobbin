@@ -1,13 +1,8 @@
-# docker-compose.yml
-
-version: '3.8'
-
 services:
-  mobbin-api:
+  pmobbin:
     build: .
-    container_name: mobbin-api
     ports:
-      - "8085:8000"
+      - "8085:8085"
     env_file:
       - .env
     restart: unless-stopped
